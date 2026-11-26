@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>表情で動くキャラクター</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%99%82%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css?v=20261126">
+<link rel="stylesheet" href="css/app.css?v=20261126">
+</head>
+<body>
+<header>
+  <h1>表情で動くキャラクター</h1>
+  <span id="camStatus" class="pill wait">顔判定：準備中…</span>
+  <span id="stageStatus" class="pill ng">出力画面：未接続</span>
+  <span class="spacer"></span>
+  <button id="btnCam" class="primary" disabled>▶ カメラ開始</button>
+  <button id="btnOpenStage">出力画面を開く</button>
+  <button id="btnFull" title="キャラクターだけを全画面表示（F）">全画面</button>
+  <button id="btnPanel" title="右の設定を隠す／出す（H）">設定を隠す</button>
+</header>
+
+<main>
+  <section id="stageWrap">
+    <canvas id="cv" width="1920" height="1080"></canvas>
+    <div id="monitor">
+      <div id="camBox">
+        <video id="video" playsinline muted></video>
+        <canvas id="ov"></canvas>
+        <div id="monLabel">カメラ停止中</div>
+      </div>
+      <div id="guide">
+        <div class="gh">
+          <div class="gthumb"><img id="gThumb" alt=""></div>
+          <div><small>いまの出力</small><b id="gNow">—</b></div>
+        </div>
+        <div class="gcap"><span>こうすると</span><span>しきい値 ┃</span><span>こう変わる</span></div>
+        <div id="gRows"></div>
+      </div>
+    </div>
+    <div id="countdown" class="hide"></div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>表情の判定 <span class="muted" id="fps"></span></h2>
+      <div id="now" class="now">—</div>
+      <div id="meters"></div>
+      <p class="note">バーが縦線を越えると切り替わります。スライダーで縦線（しきい値）を動かせます。左にするほど反応しやすくなります。</p>
+      <div class="row"><button id="btnCalib" class="primary">いつもの顔を登録</button><span class="spacer"></span><button id="btnResetDetect">元に戻す</button></div>
+      <p class="note">最初に、正面を向いて力を抜いた顔で押してください（3秒後に記録します）。人による違いが補正されます。</p>
+      <div class="row"><label for="rngHold">切り替えの間</label><input id="rngHold" type="range" min="0" max="800" step="10"><output id="outHold"></output></div>
+      <p class="note">表情がちらつくときは長くします。</p>
+      <div class="row"><label>表情</label><div id="faceButtons" class="faces"></div></div>
+      <p class="note"><kbd>0</kbd> 自動（顔で判定）／<kbd>1</kbd>〜<kbd>6</kbd> 表情を固定（口の動きはカメラのまま）。</p>
+    </div>
+
+    <div class="card" id="imgCard">
+      <h2>キャラクター画像 <span id="imgCount" class="muted"></span></h2>
+      <div id="slots" class="slots"></div>
+      <div class="row"><button id="btnBulk" class="primary">画像をまとめて選ぶ</button><span class="spacer"></span><button id="btnSample">サンプル</button></div>
+      <input id="fileBulk" type="file" accept="image/png,image/webp,image/jpeg" multiple hidden>
+      <input id="fileOne" type="file" accept="image/png,image/webp,image/jpeg" hidden>
+      <p class="note">枠をクリックして1枚ずつ選ぶか、ファイルを枠にドラッグします。ファイル名を <code>happy_half.png</code>・<code>喜び_半.png</code> のようにしておくと、「まとめて選ぶ」で18枚が自動で振り分けられます（口は closed／half／open または 閉／半／開）。背景が透明なPNGを、18枚とも同じ大きさで用意してください。</p>
+      <div class="row"><button id="btnExport">キャラクターを書き出す</button><button id="btnImport">読み込む</button></div>
+      <input id="fileImport" type="file" accept=".json,application/json" hidden>
+      <p class="note">「しゃべるキャラクター」で書き出したファイル（10枚）も読み込めます。足りない「悲しみ」「半開き」は、近い画像で代わりに表示します。</p>
+    </div>
+
+    <div class="card">
+      <h2>表示</h2>
+      <div class="row"><label>背景色</label>
+        <div class="seg" id="bgButtons">
+          <button data-bg="#00ff00"><i style="background:#00ff00"></i>緑</button>
+          <button data-bg="#0000ff"><i style="background:#0000ff"></i>青</button>
+          <button data-bg="#ff00ff"><i style="background:#ff00ff"></i>マゼンタ</button>
+          <button data-bg="#ffffff"><i style="background:#ffffff"></i>白</button>
+        </div>
+      </div>
+      <div class="row"><label for="rngX">左右</label><input id="rngX" type="range" min="-960" max="960" step="5"><output id="outX"></output></div>
+      <div class="row"><label for="rngY">上下</label><input id="rngY" type="range" min="-540" max="540" step="5"><output id="outY"></output></div>
+      <div class="row"><label for="rngScale">大きさ</label><input id="rngScale" type="range" min="0.2" max="2" step="0.01"><output id="outScale"></output></div>
+      <div class="row"><label for="rngMotion">頭の動き</label><input id="rngMotion" type="range" min="0" max="1.5" step="0.05"><output id="outMotion"></output></div>
+      <div class="row"><label class="check"><input id="chkBounce" type="checkbox"> 口を開けると少し弾む</label></div>
+      <div class="row"><label class="check"><input id="chkMirror" type="checkbox"> 鏡のように動かす（カメラ映像を左右反転）</label></div>
+      <div class="row"><span class="spacer"></span><button id="btnResetLayout">位置と大きさを元に戻す</button></div>
+    </div>
+
+    <div class="card">
+      <h2>カメラ</h2>
+      <div class="row"><label for="selCam">使うカメラ</label><select id="selCam"><option value="">標準のカメラ</option></select></div>
+      <div class="row"><label class="check"><input id="chkMonitor" type="checkbox"> カメラ映像とガイドを左下に表示（<kbd>M</kbd>）</label></div>
+      <p class="note">カメラの映像はこのパソコンの中だけで処理され、どこにも送られません。</p>
+    </div>
+  </aside>
+</main>
+<div id="toast" class="hide"></div>
+<script src="js/common.js?v=20261126"></script>
+<script src="js/detect.js?v=20261126"></script>
+<script src="js/render.js?v=20261126"></script>
+<script type="module" src="js/app.js?v=20261126"></script>
+</body>
+</html>

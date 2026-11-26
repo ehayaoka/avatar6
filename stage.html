@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>出力画面 - 表情で動くキャラクター</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #00ff00; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: contain; display: block; }
+  #hint { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); background: rgba(0,0,0,.78); color: #fff;
+          font: 16px/1.6 -apple-system, "Hiragino Sans", "Meiryo", sans-serif; padding: 8px 18px; border-radius: 8px; transition: opacity .4s; white-space: nowrap; }
+  #hint.hide { opacity: 0; pointer-events: none; }
+  body.nocursor { cursor: none; }
+</style>
+</head>
+<body>
+<canvas id="cv" width="1920" height="1080"></canvas>
+<div id="hint" class="hide"></div>
+<script src="js/common.js?v=20261126"></script>
+<script src="js/render.js?v=20261126"></script>
+<script>
+'use strict';
+/* 出力画面：操作画面から届く表情・口・頭の動きをそのまま描く（カメラは操作画面だけが使う） */
+const stage = new Stage(document.getElementById('cv'));
+window.__stage = stage;
+const ch = new BroadcastChannel(CHANNEL), ID = Math.random().toString(36).slice(2), hint = document.getElementById('hint');
+ch.onmessage = ev => {
+  const m = ev.data; if (!m) return;
+  if (m.type === 'config') { stage.setConfig(m.config); document.body.style.background = m.config.bg === 'transparent' ? '#000' : m.config.bg; }
+  else if (m.type === 'state') stage.setState(m.state);
+  else if (m.type === 'images') stage.loadImages();
+  else if (m.type === 'who') ch.postMessage({ type: 'hello', id: ID });
+};
+stage.loadImages();
+ch.postMessage({ type: 'hello', id: ID });
+setInterval(() => ch.postMessage({ type: 'hb', id: ID }), 1000);
+let hintTimer = 0;
+function showHint() { hint.textContent = 'ダブルクリックで全画面表示（Esc で解除）'; hint.classList.remove('hide'); clearTimeout(hintTimer); hintTimer = setTimeout(() => hint.classList.add('hide'), 8000); }
+const goFull = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); };
+document.addEventListener('dblclick', goFull);
+document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') goFull(); });
+document.addEventListener('fullscreenchange', () => { if (document.fullscreenElement) hint.classList.add('hide'); else showHint(); });
+let curTimer = 0;
+document.addEventListener('mousemove', () => { document.body.classList.remove('nocursor'); clearTimeout(curTimer); curTimer = setTimeout(() => document.body.classList.add('nocursor'), 2000); });
+showHint();
+</script>
+</body>
+</html>
